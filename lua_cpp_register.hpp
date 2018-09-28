@@ -77,7 +77,7 @@ namespace sstd {
     LUA_REGISTER_DLL_EXPORT LuaKeyUnsignedInteger setRegisterTypeIndex(const std::string_view);
     LUA_REGISTER_DLL_EXPORT std::shared_ptr<LuaTypeFunctionsMap> getRegisterFunctionMap(LuaKeyUnsignedInteger);
 
-    LUA_REGISTER_DLL_EXPORT void attachStdTypeIndex(const std::string_view,const std::type_index);
+    LUA_REGISTER_DLL_EXPORT void attachStdTypeIndex(const std::string_view, const std::type_index);
     LUA_REGISTER_DLL_EXPORT void removeStdTypeIndex(const std::type_index);
     LUA_REGISTER_DLL_EXPORT std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::type_index);
 
@@ -274,21 +274,21 @@ namespace sstd {
             };
 
             template<std::size_t N, typename T, bool = (N < T::size()) >
-                class tree_to_list_helper {
-                public:
-                    using type = T;
-                };
+            class tree_to_list_helper {
+            public:
+                using type = T;
+            };
 
-                template<std::size_t N, typename T >
-                class tree_to_list_helper<N, T, true > {
-                    static_assert(N < 256, "this may be a error");
-                    using TypeN = typename private_sstd::get_from_index<N, T>::type/*get_from_index*/;
-                    using TypeNSupers = typename has_supers_help</*HasSupers*/TypeN>::type/*HasSupers*/;
-                    using TypeNext = typename private_sstd::unique_cat< T, TypeNSupers/*unique_cat*/>::type/*unique_cat*/;
-                public:
-                    using type =
-                        typename tree_to_list_helper< N + 1, TypeNext/*TreeToListHelper*/>::type/*TreeToListHelper*/;
-                };
+            template<std::size_t N, typename T >
+            class tree_to_list_helper<N, T, true > {
+                static_assert(N < 256, "this may be a error");
+                using TypeN = typename private_sstd::get_from_index<N, T>::type/*get_from_index*/;
+                using TypeNSupers = typename has_supers_help</*HasSupers*/TypeN>::type/*HasSupers*/;
+                using TypeNext = typename private_sstd::unique_cat< T, TypeNSupers/*unique_cat*/>::type/*unique_cat*/;
+            public:
+                using type =
+                    typename tree_to_list_helper< N + 1, TypeNext/*TreeToListHelper*/>::type/*TreeToListHelper*/;
+            };
 
         }
 
