@@ -1,0 +1,16 @@
+cache
+cache-downloads
+inspector
+api
+source/inspector.html
+bin
+*.user
+.vs
+*.sln
+*.vcxproj
+*.filters
+*.stash
+*.qmlc
+*.autosave
+/debug
+/release
