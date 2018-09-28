@@ -101,12 +101,22 @@ namespace sstd {
                 return varPos->second.function;
             }
 
+            void clear() {
+                std::unique_lock varWriteLock{ mutex };
+                data.clear();
+            }
+
         };
 
     }/**/
 
     LuaTypeFunctionsMap::LuaTypeFunctionsMap() :mmm_private(make_unique<LuaTypeFunctionsMapPrivate>()) {
 
+    }
+
+    void LuaTypeFunctionsMap::clear() {
+        auto p = static_cast<LuaTypeFunctionsMapPrivate*>(mmm_private.get());
+        p->clear();
     }
 
     void LuaTypeFunctionsMap::appendFunction(const std::string_view & k, Function v) {
@@ -133,11 +143,17 @@ namespace sstd {
 
     namespace {
 
+        class LuaTypeFunctionsMapInner : public LuaTypeFunctionsMap {
+        public:
+            using LuaTypeFunctionsMap::clear;
+        };
+
         class ClassItemInformation : public VirtualBasic {
         public:
             LuaKeyString className;
             LuaKeyUnsignedInteger classIndex;
-            std::shared_ptr<LuaTypeFunctionsMap> classFunctions;
+            std::shared_ptr<LuaTypeFunctionsMapInner> classFunctions;
+            std::type_index stdTypeIndex{ typeid(int) };
         };
 
         class ClassItemInformations : public VirtualBasic {
@@ -145,7 +161,7 @@ namespace sstd {
             std::shared_mutex mutex;
             vector<std::unique_ptr<ClassItemInformation>> items;
             unordered_map<std::string_view, LuaKeyUnsignedInteger> dataMap;
-
+            unordered_map<std::type_index, LuaKeyUnsignedInteger> stdDataMap;
             std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::string_view arg) {
                 std::shared_lock varReadLock{ mutex };
                 auto varPos = dataMap.find(arg);
@@ -185,7 +201,7 @@ namespace sstd {
                     items.push_back(std::move(varData));
                     varDataPointer->className = arg;
                     varDataPointer->classIndex = items.size() - 1;
-                    varDataPointer->classFunctions = make_shared<LuaTypeFunctionsMap>();
+                    varDataPointer->classFunctions = make_shared<LuaTypeFunctionsMapInner>();
                     dataMap.emplace(varDataPointer->className, varDataPointer->classIndex);
                     return varDataPointer->classIndex;
                 }
@@ -197,6 +213,29 @@ namespace sstd {
                     return items[arg]->classFunctions;
                 }
                 return{};
+            }
+
+            void attachStdTypeIndex(const std::string_view n, const std::type_index i) {
+                const auto varIndex = appendRegisterTypeIndex(n);
+                std::unique_lock varWriteLock{ mutex };
+                items[varIndex]->stdTypeIndex = i;
+                stdDataMap.erase(i);
+                stdDataMap.emplace(i, varIndex);
+            }
+
+            void removeStdTypeIndex(const std::type_index i) {
+                std::unique_lock varWriteLock{ mutex };
+                auto pos = stdDataMap.find(i);
+                if (pos == stdDataMap.end()) { return; }
+                items[pos->second]->stdTypeIndex = typeid(int);
+                items[pos->second]->classFunctions->clear();
+                stdDataMap.erase(pos);
+            }
+            std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::type_index arg) {
+                std::shared_lock varReadLock{ mutex }; 
+                auto pos = stdDataMap.find(arg);
+                if (pos == stdDataMap.end()) { return {}; }
+                return pos->second;
             }
 
         };
@@ -217,6 +256,18 @@ namespace sstd {
 
     std::shared_ptr<LuaTypeFunctionsMap> getRegisterFunctionMap(LuaKeyUnsignedInteger arg) {
         return ClassItemInformations::instance()->getRegisterFunctionMap(arg);
+    }
+
+    void attachStdTypeIndex(const std::string_view x, const std::type_index y) {
+        return ClassItemInformations::instance()->attachStdTypeIndex(x, y);
+    }
+
+    void removeStdTypeIndex(const std::type_index c) {
+        return ClassItemInformations::instance()->removeStdTypeIndex(c);
+    }
+
+    std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::type_index c) {
+        return ClassItemInformations::instance()->getRegisterIndex(c);
     }
 
 }/*namespace sstd*/

@@ -14,6 +14,9 @@
 #include <initializer_list>
 using namespace std::string_view_literals;
 
+#include <typeinfo>
+#include <typeindex>
+
 namespace sstd {
 
     LUA_REGISTER_DLL_EXPORT class VirtualBasic {
@@ -49,6 +52,8 @@ namespace sstd {
         void appendFunction(LuaKeyUnsignedInteger, Function);
         std::optional<Function> getFunction(LuaKeyUnsignedInteger) const;
         std::optional<Function> getFunction(const std::string_view &) const;
+    protected:
+        void clear();
     };
 
     LUA_REGISTER_DLL_EXPORT class RuntimClass :
@@ -72,6 +77,9 @@ namespace sstd {
     LUA_REGISTER_DLL_EXPORT LuaKeyUnsignedInteger setRegisterTypeIndex(const std::string_view);
     LUA_REGISTER_DLL_EXPORT std::shared_ptr<LuaTypeFunctionsMap> getRegisterFunctionMap(LuaKeyUnsignedInteger);
 
+    LUA_REGISTER_DLL_EXPORT void attachStdTypeIndex(const std::string_view,const std::type_index);
+    LUA_REGISTER_DLL_EXPORT void removeStdTypeIndex(const std::type_index);
+    LUA_REGISTER_DLL_EXPORT std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::type_index);
 
     /**********************************************************************************/
     namespace private_sstd {
@@ -358,8 +366,13 @@ namespace sstd {
                 return reinterpret_cast<This *>(arg);
             });
         }
-        using super_types = typename private_sstd::tree_to_list<ThisType>::type;
-        register_super_help<This, super_types>::run(varThisFuncsMap.get());
+        {/*add supers*/
+            using super_types = typename private_sstd::tree_to_list<ThisType>::type;
+            register_super_help<This, super_types>::run(varThisFuncsMap.get());
+        }
+        {/*add std index support*/
+            attachStdTypeIndex(ThisType::typeName(), typeid(This));
+        }
         return varThisTypeIndex;
     }
 
