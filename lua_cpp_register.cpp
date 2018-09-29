@@ -31,16 +31,16 @@ namespace sstd {
     template<typename K, typename V>
     using unordered_map = std::unordered_map<K, V>;
 
-    RuntimClass::RuntimClass() {
+    RuntimeClass::RuntimeClass() {
 
     }
 
-    RuntimClass::~RuntimClass() {
+    RuntimeClass::~RuntimeClass() {
 
     }
 
     LuaKeyString::LuaKeyString(const std::string_view & arg) {
-        auto varThisData = std::make_shared<string>(arg);
+        auto varThisData = sstd::make_shared<string>(arg);
         ttt_super_type::operator=(*varThisData);
         mmm_data = std::move(varThisData);
     }
@@ -112,7 +112,7 @@ namespace sstd {
 
     }/**/
 
-    LuaTypeFunctionsMap::LuaTypeFunctionsMap() :mmm_private(make_unique<LuaTypeFunctionsMapPrivate>()) {
+    LuaTypeFunctionsMap::LuaTypeFunctionsMap() :mmm_private(sstd::make_unique<LuaTypeFunctionsMapPrivate>()) {
 
     }
 
@@ -179,7 +179,7 @@ namespace sstd {
             }
 
             static ClassItemInformations * instance() {
-                static auto varAns = std::make_shared<ClassItemInformations>();
+                static auto varAns = sstd::make_shared<ClassItemInformations>();
                 return varAns.get();
             }
 
@@ -213,12 +213,12 @@ namespace sstd {
                     if (varPos != dataMap.end()) {
                         return varPos->second;
                     }
-                    auto varData = make_unique<ClassItemInformation>();
+                    auto varData = sstd::make_unique<ClassItemInformation>();
                     auto varDataPointer = varData.get();
                     items.push_back(std::move(varData));
                     varDataPointer->className = arg;
                     varDataPointer->classIndex = items.size() - 1;
-                    varDataPointer->classFunctions = make_shared<LuaTypeFunctionsMapInner>();
+                    varDataPointer->classFunctions = sstd::make_shared<LuaTypeFunctionsMapInner>();
                     dataMap.emplace(varDataPointer->className, varDataPointer->classIndex);
                     return varDataPointer->classIndex;
                 }
@@ -295,6 +295,22 @@ namespace sstd {
     std::type_index invalidStdTypeIndex() {
         const static std::type_index varAns{ typeid(invalid_type) };
         return varAns;
+    }
+
+    std::shared_ptr<LightWeightRuntimeClass<void>> __createLightWeightRuntimeData(void * a, LuaKeyUnsignedInteger b) {
+        return sstd::make_shared<LightWeightRuntimeClass<void>>(a, b);
+    }
+
+    std::shared_ptr<LightWeightRuntimeClass<void>> __createLightWeightRuntimeData(const void * a, LuaKeyUnsignedInteger b) {
+        return sstd::make_shared<LightWeightRuntimeClass<void>>(a, b);
+    }
+
+    std::shared_ptr<StdSharedPointerRuntimeClass<void>> __createStdSharedPointerRuntimeData(std::shared_ptr<const void> a, LuaKeyUnsignedInteger b) {
+        return sstd::make_shared< StdSharedPointerRuntimeClass<void> >( std::move(a) , b);
+    }
+
+    std::shared_ptr<StdSharedPointerRuntimeClass<void>> __createStdSharedPointerRuntimeData(std::shared_ptr<void> a, LuaKeyUnsignedInteger b) {
+        return sstd::make_shared< StdSharedPointerRuntimeClass<void> >( std::move(a)  , b);
     }
 
 }/*namespace sstd*/

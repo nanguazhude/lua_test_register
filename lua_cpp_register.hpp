@@ -5,6 +5,8 @@
 #endif
 
 #include <lua.hpp>
+
+#include <atomic>
 #include <variant>
 #include <cstddef>
 #include <cstdint>
@@ -58,21 +60,32 @@ namespace sstd {
         void clear();
     };
 
-    LUA_REGISTER_DLL_EXPORT class RuntimClass :
-        public virtual VirtualBasic {
+    LUA_REGISTER_DLL_EXPORT class RuntimeClass :
+        public virtual VirtualBasic,
+        public std::enable_shared_from_this<RuntimeClass> {
     public:
-        RuntimClass();
-        RuntimClass(const RuntimClass &) = delete;
-        RuntimClass(RuntimClass &&) = delete;
-        RuntimClass &operator=(const RuntimClass &) = delete;
-        RuntimClass &operator=(RuntimClass &&) = delete;
-        virtual ~RuntimClass();
+        enum DataType : std::uint32_t {
+            type_light_wight = (1 << 0),
+            type_shared_pointer,
+            type_direct_create,
+            type_user,
+        };
+    public:
+        RuntimeClass();
+        RuntimeClass(const RuntimeClass &) = delete;
+        RuntimeClass(RuntimeClass &&) = delete;
+        RuntimeClass &operator=(const RuntimeClass &) = delete;
+        RuntimeClass &operator=(RuntimeClass &&) = delete;
+        virtual ~RuntimeClass();
     public:
         virtual void * data() const = 0/*get the runtime data*/;
         virtual LuaKeyUnsignedInteger registerTypeIndex() const = 0/*get the logical type index*/;
         inline virtual std::string_view registerTypeName() const /*get the logical type name*/;
         inline virtual std::shared_ptr<LuaTypeFunctionsMap> registerTypeFunctions() const /*get the logical type functions*/;
         inline virtual std::type_index registerStdTypeIndex() const /*get the logcial std type index*/;
+        inline virtual bool isOwnData() const { return false; }/*true own data,flase not*/
+        inline virtual bool isReadOnly() const { return false; }
+        inline virtual DataType dataType() const { return DataType::type_user; }
     };
 
     LUA_REGISTER_DLL_EXPORT std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::string_view);
@@ -389,21 +402,131 @@ namespace sstd {
         return registerTypeDirect<This, _ThisType<This>>();
     }
 
-    inline std::string_view RuntimClass::registerTypeName() const {
+    inline std::string_view RuntimeClass::registerTypeName() const {
         const auto varAns = getRegisterName(this->registerTypeIndex());
         if (varAns) { return *varAns; }
         return {};
     }
 
-    inline std::shared_ptr<LuaTypeFunctionsMap> RuntimClass::registerTypeFunctions() const {
+    inline std::shared_ptr<LuaTypeFunctionsMap> RuntimeClass::registerTypeFunctions() const {
         return getRegisterFunctionMap(this->registerTypeIndex());
     }
 
-    inline std::type_index RuntimClass::registerStdTypeIndex() const {
+    inline std::type_index RuntimeClass::registerStdTypeIndex() const {
         const auto varAns = getRegisterStdTypeIndex(this->registerTypeIndex());
         if (varAns) { return *varAns; }
         return{ invalidStdTypeIndex() };
     }
+
+    template<typename __T>
+    class LightWeightRuntimeClass : public RuntimeClass {
+        static_assert(false == std::is_const_v<__T>);
+        static_assert(false == std::is_array_v<__T>);
+        LuaKeyUnsignedInteger mmm_type_index;
+        __T * mmm_data;
+        bool mmm_is_read_only;
+    public:
+        void * data() const override { return const_cast<void*>(mmm_data); }
+        LuaKeyUnsignedInteger registerTypeIndex() const override { return mmm_type_index; }
+        bool isReadOnly() const override { return mmm_is_read_only; }
+        DataType dataType() const override { return DataType::type_light_wight; }
+        bool isOwnData() const { return false; }
+        LightWeightRuntimeClass(const __T * a, LuaKeyUnsignedInteger b) :
+            mmm_type_index(b),
+            mmm_data(const_cast<void*>(a)),
+            mmm_is_read_only(true) {}
+        LightWeightRuntimeClass(__T * a, LuaKeyUnsignedInteger b) :
+            mmm_type_index(b),
+            mmm_data(a),
+            mmm_is_read_only(false) {}
+    };
+
+    LUA_REGISTER_DLL_EXPORT std::shared_ptr<LightWeightRuntimeClass<void>> __createLightWeightRuntimeData(const void *, LuaKeyUnsignedInteger);
+    LUA_REGISTER_DLL_EXPORT std::shared_ptr<LightWeightRuntimeClass<void>> __createLightWeightRuntimeData(void *, LuaKeyUnsignedInteger);
+
+    template<typename T>
+    std::shared_ptr<LightWeightRuntimeClass<T>> createLightWeightRuntimeData(const T * a, LuaKeyUnsignedInteger b) {
+        return std::reinterpret_pointer_cast<T>(__createLightWeightRuntimeData(a, b));
+    }
+
+    template<typename T>
+    std::shared_ptr<LightWeightRuntimeClass<T>> createLightWeightRuntimeData(T * a, LuaKeyUnsignedInteger b) {
+        return std::reinterpret_pointer_cast<T>(__createLightWeightRuntimeData(a, b));
+    }
+
+    template<typename __T>
+    class StdSharedPointerRuntimeClass : public RuntimeClass {
+        static_assert(false == std::is_const_v<__T>);
+        static_assert(false == std::is_array_v<__T>);
+        LuaKeyUnsignedInteger mmm_type_index;
+        std::shared_ptr<__T>  mmm_data;
+        bool mmm_is_read_only;
+    public:
+        void * data() const override { return const_cast<void*>(static_cast<const void *>(mmm_data.get())); }
+        LuaKeyUnsignedInteger registerTypeIndex() const override { return mmm_type_index; }
+        bool isReadOnly() const override { return mmm_is_read_only; }
+        DataType dataType() const override { return DataType::type_shared_pointer; }
+        bool isOwnData() const { return true; }
+        StdSharedPointerRuntimeClass(std::shared_ptr<const __T> a, LuaKeyUnsignedInteger b) :
+            mmm_type_index(b),
+            mmm_data(std::const_pointer_cast<__T>(std::move(a))),
+            mmm_is_read_only(true) {}
+        StdSharedPointerRuntimeClass(std::shared_ptr<__T> a, LuaKeyUnsignedInteger b) :
+            mmm_type_index(b),
+            mmm_data(std::move(a)),
+            mmm_is_read_only(false) {}
+    };
+
+    LUA_REGISTER_DLL_EXPORT std::shared_ptr<StdSharedPointerRuntimeClass<void>> __createStdSharedPointerRuntimeData(std::shared_ptr<const void>, LuaKeyUnsignedInteger);
+    LUA_REGISTER_DLL_EXPORT std::shared_ptr<StdSharedPointerRuntimeClass<void>> __createStdSharedPointerRuntimeData(std::shared_ptr<void>, LuaKeyUnsignedInteger);
+
+    template<typename T>
+    std::shared_ptr<StdSharedPointerRuntimeClass<T>> createStdSharedPointerRuntimeData(std::shared_ptr<T> a, LuaKeyUnsignedInteger b) {
+        return std::reinterpret_pointer_cast<T>(__createStdSharedPointerRuntimeData(std::move(a), b));
+    }
+
+    template<typename T>
+    std::shared_ptr<StdSharedPointerRuntimeClass<T>> createStdSharedPointerRuntimeData(std::shared_ptr<const T> a, LuaKeyUnsignedInteger b) {
+        return std::reinterpret_pointer_cast<T>(__createStdSharedPointerRuntimeData(std::move(a), b));
+    }
+
+    template<typename __T>
+    class DirectCreateRuntimeClass : public RuntimeClass {
+        static_assert(false == std::is_const_v<__T>);
+        static_assert(false == std::is_array_v<__T>);
+        std::atomic_int32_t mmm_data_cout{0};
+        __T * mmm_data=nullptr;
+        bool mmm_is_read_only = false;
+        static LuaKeyUnsignedInteger get_mmm_type_index() {
+            static LuaKeyUnsignedInteger varAns = *getRegisterIndex(typeid());
+            return varAns;
+        }
+    public:
+        template<typename ... Args>
+        DirectCreateRuntimeClass(Args && ... args) {
+            mmm_data = new __T(std::forward<Args>(args)...);
+            mmm_data_cout.store(1);
+        }
+
+        ~DirectCreateRuntimeClass() {
+            --mmm_data_cout;
+            if (mmm_data_cout.load() < 1) { delete mmm_data; }
+        }
+
+        void * data() const override { return const_cast<void*>(static_cast<const void *>( mmm_data ) ); }
+        LuaKeyUnsignedInteger registerTypeIndex() const override { return get_mmm_type_index(); }
+        bool isReadOnly() const override { return mmm_is_read_only; }
+        DataType dataType() const override { return DataType::type_direct_create; }
+        bool isOwnData() const { return mmm_data_cout.load()==1; }
+        void setReadOnly() { mmm_is_read_only = true; }
+
+    };
+    
+    template<typename T,typename ...Args>
+    std::shared_ptr<std::remove_const_t<T>> cretaeDirectCreateRuntimeClass(Args && ... args) {
+        return std::make_shared< std::remove_const_t<T> >(std::forward<Args>(args)...);
+    }
+
 }/*namespace sstd*/
 
 
