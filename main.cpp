@@ -3,6 +3,7 @@
 
 #include "lua_cpp_register.hpp"
  
+static int varPointer = 0;
 
 class TypeA {};
 
@@ -28,19 +29,28 @@ public:
 
 #include <lua.hpp>
 #include <iostream>
+
 int map_function(lua_State *L) try{
 
-    std::cout << "the stack size : " <<lua_gettop(L) <<std::endl ;
-    lua_pushvalue(L, lua_upvalueindex(1) );
-    std::cout << "upvalue is table : " <<lua_istable(L,-1) <<std::endl ;
-    lua_rawgeti(L,-1,1);
-    std::cout << lua_tointeger(L,-1) <<std::endl ;
-    lua_pop(L,2);
+  //      std::cout << "the stack size : " <<lua_gettop(L) <<std::endl ;
+  // lua_pushvalue(L, lua_upvalueindex(1) );
+  // std::cout << "upvalue is table : " <<lua_istable(L,-1) <<std::endl ;
+  // lua_rawgeti(L,-1,1);
+  // std::cout << lua_tointeger(L,-1) <<std::endl ;
+  // lua_pop(L,2);
 
     lua_checkstack(L, 8);
        
-    const auto varType = lua_type(L,-1);
+    std::cout << "input table?" << lua_type(L, -2) << std::endl;
 
+    {
+        lua_rawgetp(L,-2,nullptr);
+        std::cout << "input user?" << lua_type(L, -1) << std::endl;
+        lua_pop(L,1);
+    }
+
+    const auto varType = lua_type(L,-1);
+       
     if (varType == LUA_TNUMBER) {
         const auto varIndex = lua_tointeger(L,-1);
         std::cout << varIndex << std::endl; 
@@ -70,15 +80,22 @@ catch (...) {
     throw;
 }
 
-int destory_function(lua_State *L) {
-    std::cout << "destory" << std::endl;
 
-    std::destroy_at( reinterpret_cast<std::shared_ptr<void>*>( lua_touserdata(L,-1) ) );
+int destory_function(lua_State *L) {
+  
+    std::cout << "destory" << lua_gettop(L) << std::endl;
+    std::cout << lua_type(L, -1) << std::endl;
+    
+    lua_rawgetp(L,-1,nullptr);
+    void * varData = lua_touserdata(L, -1);
+    std::destroy_at( reinterpret_cast<std::shared_ptr<void>*>(varData) );
 
     return 0;
 }
 
 int show_error(lua_State *L) {
+
+    std::cout << "error" << std::endl;
 
     const char * string_data;
     std::size_t string_length;
@@ -89,7 +106,109 @@ int show_error(lua_State *L) {
     return 0;
 }
 
-int main(int argc, char ** argv) {
+int main(int argc,char ** argv) {
+
+    QApplication varApp{ argc,argv };
+
+    auto L = luaL_newstate();
+    luaL_openlibs(L);
+
+    lua_checkstack(L,20);
+
+    int varReadMetaTable;
+    if (luaL_newmetatable(L, "std::shared_ptr<void>")) {
+    
+        varReadMetaTable = lua_gettop(L);
+
+        lua_pushvalue(L,varReadMetaTable);
+    
+        lua_pushlstring(L, "__index", 7);
+        lua_pushcclosure(L, &map_function, 0);
+        lua_rawset(L, varReadMetaTable);
+
+        lua_pushlstring(L, "__gc", 4);
+        lua_pushcclosure(L, &destory_function,0);
+        lua_rawset(L, varReadMetaTable);
+
+    }
+
+    /*get meta table*/
+    luaL_newmetatable(L, "std::shared_ptr<void>");
+    varReadMetaTable = lua_gettop(L);
+    
+    auto varMemory = lua_newuserdata(L, sizeof(std::shared_ptr<void>));
+    auto varData = ::new(varMemory)  std::shared_ptr<void>();
+    auto varUserData = lua_gettop(L);
+
+    lua_newtable(L,0,4);
+    auto varWriteMetaTable = lua_gettop(L);
+
+    lua_pushstring(L, "std::shared_ptr<void>");
+    lua_setfield(L, varWriteMetaTable, "__name");  /* metatable.__name = tname */
+
+    lua_pushlstring(L, "__newindex", 10);
+    lua_pushvalue(L, varWriteMetaTable);
+    lua_rawset(L, varWriteMetaTable);
+
+    //lua_pushlstring(L,"__index",7);
+    //lua_pushvalue(L,-1);
+    //lua_gettable(L,varReadMetaTable);
+    //lua_rawset(L, varWriteMetaTable);
+
+    lua_pushlstring(L, "__index", 7);
+    lua_pushvalue(L, varWriteMetaTable);
+    lua_rawset(L, varWriteMetaTable);
+
+    //lua_pushlstring(L, "__gc", 4);
+    //lua_pushvalue(L,-1);
+    //lua_gettable(L, varReadMetaTable);
+    //lua_rawset(L, varWriteMetaTable);
+
+    lua_pushvalue(L,varUserData);
+    lua_rawsetp(L,varWriteMetaTable, nullptr);
+
+    lua_pushvalue(L,varReadMetaTable);
+    lua_setmetatable(L,varWriteMetaTable);
+
+    lua_pushvalue(L, varWriteMetaTable);
+    lua_setmetatable(L,varUserData);
+
+    lua_pushvalue(L,varUserData);
+    lua_setglobal(L, "bbc");
+    
+    lua_pushcfunction(L, &show_error);
+    auto varErrorFunction = lua_gettop(L);
+
+    luaL_loadstring(L, u8R"( 
+       print("Hellow Word!") ;
+       bbc.ffc = 666 ;
+       print(bbc.ffc);
+       -- print(bbc.ffe);
+       bbc.ffe();
+ )");
+
+   
+    if (lua_type(L, -1) == LUA_TSTRING) {
+        show_error(L);
+    }
+    else {
+        lua_pcall(L, 0, 0, varErrorFunction);
+    }
+
+
+
+    lua_close(L);
+
+
+    QWidget widget;
+    widget.show();
+
+
+    return varApp.exec();
+
+}
+
+int __main(int argc, char ** argv) {
 
     class TypeC final : public TypeB {
     public:
