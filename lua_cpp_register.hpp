@@ -86,7 +86,13 @@ namespace sstd {
         inline virtual bool isOwnData() const { return false; }/*true own data,flase not*/
         inline virtual bool isReadOnly() const { return false; }
         inline virtual DataType dataType() const { return DataType::type_user; }
+    public:
+        virtual void setReadOnly() {}
+        virtual void clearReadOnly() {}
+        virtual void addOwnner() {}
+        virtual void removeOwnner() {}
     };
+
 
     LUA_REGISTER_DLL_EXPORT std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::string_view);
     LUA_REGISTER_DLL_EXPORT std::optional<std::string_view> getRegisterName(LuaKeyUnsignedInteger);
@@ -430,7 +436,9 @@ namespace sstd {
         LuaKeyUnsignedInteger registerTypeIndex() const override { return mmm_type_index; }
         bool isReadOnly() const override { return mmm_is_read_only; }
         DataType dataType() const override { return DataType::type_light_wight; }
-        bool isOwnData() const { return false; }
+        bool isOwnData() const override { return false; }
+        void setReadOnly() override { mmm_is_read_only = true; }
+        void clearReadOnly() override { mmm_is_read_only = false; }
         LightWeightRuntimeClass(const __T * a, LuaKeyUnsignedInteger b) :
             mmm_type_index(b),
             mmm_data(const_cast<void*>(a)),
@@ -466,7 +474,9 @@ namespace sstd {
         LuaKeyUnsignedInteger registerTypeIndex() const override { return mmm_type_index; }
         bool isReadOnly() const override { return mmm_is_read_only; }
         DataType dataType() const override { return DataType::type_shared_pointer; }
-        bool isOwnData() const { return true; }
+        bool isOwnData() const override { return true; }
+        void setReadOnly() override { mmm_is_read_only = true; }
+        void clearReadOnly() override { mmm_is_read_only = false; }
         StdSharedPointerRuntimeClass(std::shared_ptr<const __T> a, LuaKeyUnsignedInteger b) :
             mmm_type_index(b),
             mmm_data(std::const_pointer_cast<__T>(std::move(a))),
@@ -494,11 +504,11 @@ namespace sstd {
     class DirectCreateRuntimeClass : public RuntimeClass {
         static_assert(false == std::is_const_v<__T>);
         static_assert(false == std::is_array_v<__T>);
-        std::atomic_int32_t mmm_data_cout{0};
-        __T * mmm_data=nullptr;
+        std::atomic_int32_t mmm_data_cout{ 0 };
+        __T * mmm_data = nullptr;
         bool mmm_is_read_only = false;
         static LuaKeyUnsignedInteger get_mmm_type_index() {
-            static LuaKeyUnsignedInteger varAns = *getRegisterIndex(typeid());
+            static const LuaKeyUnsignedInteger varAns = *getRegisterIndex(typeid());
             return varAns;
         }
     public:
@@ -513,18 +523,20 @@ namespace sstd {
             if (mmm_data_cout.load() < 1) { delete mmm_data; }
         }
 
-        void * data() const override { return const_cast<void*>(static_cast<const void *>( mmm_data ) ); }
+        void * data() const override { return const_cast<void*>(static_cast<const void *>(mmm_data)); }
         LuaKeyUnsignedInteger registerTypeIndex() const override { return get_mmm_type_index(); }
         bool isReadOnly() const override { return mmm_is_read_only; }
         DataType dataType() const override { return DataType::type_direct_create; }
-        bool isOwnData() const { return mmm_data_cout.load()==1; }
-        void setReadOnly() { mmm_is_read_only = true; }
-
+        bool isOwnData() const override { return mmm_data_cout.load() == 1; }
+        void setReadOnly() override { mmm_is_read_only = true; }
+        void clearReadOnly() override { mmm_is_read_only = false; }
+        void addOwnner() override { ++mmm_data_cout; }
+        void removeOwnner() override { --mmm_data_cout; }
     };
-    
-    template<typename T,typename ...Args>
-    std::shared_ptr<std::remove_const_t<T>> cretaeDirectCreateRuntimeClass(Args && ... args) {
-        return std::make_shared< std::remove_const_t<T> >(std::forward<Args>(args)...);
+
+    template<typename T, typename ...Args>
+    std::shared_ptr<DirectCreateRuntimeClass<std::remove_const_t<T>>> cretaeDirectCreateRuntimeClass(Args && ... args) {
+        return std::make_shared<DirectCreateRuntimeClass<std::remove_const_t<T>>>(std::forward<Args>(args)...);
     }
 
 }/*namespace sstd*/
