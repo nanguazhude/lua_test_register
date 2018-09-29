@@ -9,6 +9,8 @@
 
 namespace sstd {
 
+    namespace { class invalid_type {}; }
+
     using string = std::string;
     template<typename TName, typename ... Args>
     std::shared_ptr<TName> make_shared(Args && ... args) {
@@ -153,7 +155,7 @@ namespace sstd {
             LuaKeyString className;
             LuaKeyUnsignedInteger classIndex;
             std::shared_ptr<LuaTypeFunctionsMapInner> classFunctions;
-            std::type_index stdTypeIndex{ typeid(int) };
+            std::type_index stdTypeIndex{ invalidStdTypeIndex() };
         };
 
         class ClassItemInformations : public VirtualBasic {
@@ -169,6 +171,13 @@ namespace sstd {
                 return varPos->second;
             }
 
+            ClassItemInformations() {
+                /*set zero to invalid type index*/
+                constexpr const static auto invalid_class_name = "::::::invalid_type_index"sv;
+                this->appendRegisterTypeIndex(invalid_class_name);
+                this->attachStdTypeIndex(invalid_class_name, invalidStdTypeIndex());
+            }
+
             static ClassItemInformations * instance() {
                 static auto varAns = std::make_shared<ClassItemInformations>();
                 return varAns.get();
@@ -178,6 +187,14 @@ namespace sstd {
                 std::shared_lock varReadLock{ mutex };
                 if (arg < items.size()) {
                     return items[arg]->className;
+                }
+                return{};
+            }
+
+            std::optional<std::type_index> getRegisterStdTypeIndex(LuaKeyUnsignedInteger arg) {
+                std::shared_lock varReadLock{ mutex };
+                if (arg < items.size()) {
+                    return items[arg]->stdTypeIndex;
                 }
                 return{};
             }
@@ -227,12 +244,13 @@ namespace sstd {
                 std::unique_lock varWriteLock{ mutex };
                 auto pos = stdDataMap.find(i);
                 if (pos == stdDataMap.end()) { return; }
-                items[pos->second]->stdTypeIndex = typeid(int);
+                items[pos->second]->stdTypeIndex = invalidStdTypeIndex();
                 items[pos->second]->classFunctions->clear();
                 stdDataMap.erase(pos);
             }
+
             std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::type_index arg) {
-                std::shared_lock varReadLock{ mutex }; 
+                std::shared_lock varReadLock{ mutex };
                 auto pos = stdDataMap.find(arg);
                 if (pos == stdDataMap.end()) { return {}; }
                 return pos->second;
@@ -254,6 +272,10 @@ namespace sstd {
         return ClassItemInformations::instance()->getRegisterName(arg);
     }
 
+    std::optional<std::type_index> getRegisterStdTypeIndex(LuaKeyUnsignedInteger arg) {
+        return ClassItemInformations::instance()->getRegisterStdTypeIndex(arg);
+    }
+
     std::shared_ptr<LuaTypeFunctionsMap> getRegisterFunctionMap(LuaKeyUnsignedInteger arg) {
         return ClassItemInformations::instance()->getRegisterFunctionMap(arg);
     }
@@ -268,6 +290,11 @@ namespace sstd {
 
     std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::type_index c) {
         return ClassItemInformations::instance()->getRegisterIndex(c);
+    }
+
+    std::type_index invalidStdTypeIndex() {
+        const static std::type_index varAns{ typeid(invalid_type) };
+        return varAns;
     }
 
 }/*namespace sstd*/

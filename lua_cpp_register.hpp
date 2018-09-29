@@ -19,6 +19,8 @@ using namespace std::string_view_literals;
 
 namespace sstd {
 
+    LUA_REGISTER_DLL_EXPORT std::type_index invalidStdTypeIndex();
+
     LUA_REGISTER_DLL_EXPORT class VirtualBasic {
     public:
         virtual ~VirtualBasic();
@@ -66,10 +68,11 @@ namespace sstd {
         RuntimClass &operator=(RuntimClass &&) = delete;
         virtual ~RuntimClass();
     public:
-        virtual void * data() const = 0;
-        virtual std::string_view registerTypeName() const = 0;
-        virtual LuaTypeFunctionsMap * registerTypeFunctions() const = 0;
-        virtual LuaKeyUnsignedInteger registerTypeIndex() const = 0;
+        virtual void * data() const = 0/*get the runtime data*/;
+        virtual LuaKeyUnsignedInteger registerTypeIndex() const = 0/*get the logical type index*/;
+        inline virtual std::string_view registerTypeName() const /*get the logical type name*/;
+        inline virtual std::shared_ptr<LuaTypeFunctionsMap> registerTypeFunctions() const /*get the logical type functions*/;
+        inline virtual std::type_index registerStdTypeIndex() const /*get the logcial std type index*/;
     };
 
     LUA_REGISTER_DLL_EXPORT std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::string_view);
@@ -80,7 +83,7 @@ namespace sstd {
     LUA_REGISTER_DLL_EXPORT void attachStdTypeIndex(const std::string_view, const std::type_index);
     LUA_REGISTER_DLL_EXPORT void removeStdTypeIndex(const std::type_index);
     LUA_REGISTER_DLL_EXPORT std::optional<LuaKeyUnsignedInteger> getRegisterIndex(const std::type_index);
-
+    LUA_REGISTER_DLL_EXPORT std::optional<std::type_index> getRegisterStdTypeIndex(LuaKeyUnsignedInteger);
     /**********************************************************************************/
     namespace private_sstd {
 
@@ -386,6 +389,21 @@ namespace sstd {
         return registerTypeDirect<This, _ThisType<This>>();
     }
 
+    inline std::string_view RuntimClass::registerTypeName() const {
+        const auto varAns = getRegisterName(this->registerTypeIndex());
+        if (varAns) { return *varAns; }
+        return {};
+    }
+
+    inline std::shared_ptr<LuaTypeFunctionsMap> RuntimClass::registerTypeFunctions() const {
+        return getRegisterFunctionMap(this->registerTypeIndex());
+    }
+
+    inline std::type_index RuntimClass::registerStdTypeIndex() const {
+        const auto varAns = getRegisterStdTypeIndex(this->registerTypeIndex());
+        if (varAns) { return *varAns; }
+        return{ invalidStdTypeIndex() };
+    }
 }/*namespace sstd*/
 
 
