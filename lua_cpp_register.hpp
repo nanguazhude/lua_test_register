@@ -312,12 +312,12 @@ namespace sstd {
     template<typename Child>
     class IntBasicRegister {
     public:
-        constexpr static std::string_view typeName() { return "int"sv; }
-        constexpr static std::initializer_list<RegisterFunctionType> getFunctions() { return{}; }
+        inline constexpr static std::string_view typeName() { return "int"sv; }
+        inline constexpr static std::initializer_list<RegisterFunctionType> getFunctions() { return{}; }
         using supers = class_wrap<void>;
         using this_type = int;
     private:
-        static_assert((std::is_same_v<this_type,Child>)||(std::is_base_of_v<this_type,Child>),"Child must be child of this_type");
+        static_assert((std::is_same_v<this_type, Child>) || (std::is_base_of_v<this_type, Child>), "Child must be child of this_type");
     };
 
     namespace private_register_type {
@@ -352,8 +352,9 @@ namespace sstd {
 
     }/*private_register_type*/
 
-    template<typename This, typename ThisType/* SomeType<This> */ >
-    LuaKeyUnsignedInteger registerType() {
+    template<typename This, class _ThisType/* SomeType<This> */ = This >
+    inline LuaKeyUnsignedInteger registerTypeDirect() {
+        using ThisType = _ThisType;
         const std::string_view argTypeName = ThisType::typeName();
         const auto varThisTypeIndex = setRegisterTypeIndex(argTypeName);
         std::shared_ptr<LuaTypeFunctionsMap> varThisFuncsMap = getRegisterFunctionMap(varThisTypeIndex);
@@ -380,17 +381,10 @@ namespace sstd {
         return varThisTypeIndex;
     }
 
-    template<typename TName/*wrap name*/ , template<typename> class S/*wrap name*/>
-    class direct_no_member_warp final {
-        /**T should have function like static constexpr std::string_view typeName() { return "int"sv; }**/
-    public:
-        using this_type =typename TName::this_type;
-        using supers = sstd::class_wrap<S<this_type>>;
-        static constexpr inline std::initializer_list<RegisterFunctionType> getFunctions() { return{}; }
-        static constexpr inline std::string_view typeName() { return TName::typeName(); }
-    private:
-        static_assert(std::is_final_v<this_type>,"this_type must be final");
-    };
+    template<typename This, template<typename...> class _ThisType/* SomeType<This> */ >
+    inline LuaKeyUnsignedInteger registerType() {
+        return registerTypeDirect<This, _ThisType<This>>();
+    }
 
 }/*namespace sstd*/
 
