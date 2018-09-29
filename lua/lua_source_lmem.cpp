@@ -1,4 +1,4 @@
-/*
+﻿/*
 ** $Id: lmem.c,v 1.91.1.1 2017/04/19 17:20:42 roberto Exp $
 ** Interface to Memory Manager
 ** See Copyright Notice in lua.h
