@@ -10,21 +10,21 @@
 namespace sstd {
 
     using string = std::string;
-    template<typename T, typename ... Args>
-    std::shared_ptr<T> make_shared(Args && ... args) {
-        return std::make_shared<T>(std::forward<Args>(args)...);
+    template<typename TName, typename ... Args>
+    std::shared_ptr<TName> make_shared(Args && ... args) {
+        return std::make_shared<TName>(std::forward<Args>(args)...);
     }
 
-    template<typename T, typename ...Args>
-    std::unique_ptr<T> make_unique(Args && ... args) {
-        return std::make_unique<T>(std::forward<Args>(args)...);
+    template<typename TName, typename ...Args>
+    std::unique_ptr<TName> make_unique(Args && ... args) {
+        return std::make_unique<TName>(std::forward<Args>(args)...);
     }
 
     template<typename K, typename V>
     using map = std::map<K, V, std::less<void>>;
 
-    template<typename T>
-    using vector = std::vector<T>;
+    template<typename TName>
+    using vector = std::vector<TName>;
 
     template<typename K, typename V>
     using unordered_map = std::unordered_map<K, V>;

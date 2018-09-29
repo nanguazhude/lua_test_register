@@ -2,53 +2,48 @@
 #include <QtWidgets>
 
 #include "lua_cpp_register.hpp"
+ 
 
+class TypeA {};
 
-
-template<typename X>
-class A {
+template<typename Child>
+class TypeAStaticInfo final {
 public:
-    using supers = sstd::class_wrap< float>;
-    static constexpr std::string_view typeName() { return "int"sv; }
+    constexpr static std::string_view typeName() { return "TypeA"sv; }
+    constexpr static std::initializer_list<sstd::RegisterFunctionType> getFunctions() { return{}; }
+    using supers = sstd::class_wrap<void>;
+    using this_type = TypeA;
 };
 
-template<typename X>
-class B {
+class TypeB : public TypeA {};
+
+template<typename Child>
+class TypeBStaticInfo final {
 public:
-    using supers = sstd::class_wrap< double>;
-    static constexpr std::string_view typeName() { return "int"sv; }
+    constexpr static std::string_view typeName() { return "TypeB"sv; }
+    constexpr static std::initializer_list<sstd::RegisterFunctionType> getFunctions() { return{}; }
+    using supers = sstd::class_wrap< TypeAStaticInfo<Child> >;
+    using this_type = TypeB;
 };
-
-template<typename X>
-class C {
-public:
-    using supers = sstd::class_wrap< int>;
-    static constexpr std::string_view typeName() { return "int"sv; }
-};
-
-template<typename ZF>
-class Z {
-public:
-    using supers = sstd::class_wrap<A<ZF>, B<ZF>, C<ZF>>;
-};
-
-template<typename T>
-void fooo(int * arg) {}
-
-template<typename ... Txxx>
-void foxx(int * arg) {
-    ( fooo<Txxx>( arg) , ...  );
-}
 
 int main(int argc, char ** argv) {
 
-    //TreeToListHelper<1, sstd::unique_cat< HasSupers<Z<int>>::type, HasSupers <sstd::get_from_index<0, HasSupers<Z<int>>::type >::type>::type>::type>::type x;
+    class TypeC final : public TypeB {
+    public:
+        using this_type = TypeC;
+        constexpr static inline std::string_view typeName() { return "TypeC"sv; }
+    };
 
-    foxx<int,double,float>(&argc);
+    std::is_base_of<int, int>::value  ;
 
-    sstd::private_sstd::tree_to_list< Z<int> >::type xfdsfa;
+    sstd::registerType<int, sstd::IntBasicRegister<int>>();
+    sstd::registerType<TypeA, TypeAStaticInfo<TypeA>>();
+    sstd::registerType<TypeB, TypeBStaticInfo<TypeB>>();
+    sstd::registerType<TypeC, sstd::direct_no_member_warp< TypeC , TypeBStaticInfo  >  >();
+    //sstd::registerType<double, sstd::direct_no_member_warp< DoubleName, sstd::IntBasicRegister<int> >  >();
+           
 
-    //sstd::get_from_index<3, Z<int>::supers>::type sfasd;
+    sstd::private_sstd::tree_to_list<  sstd::direct_no_member_warp< TypeC, TypeBStaticInfo > >::type sdfs;
 
     QApplication varApp{ argc,argv };
 

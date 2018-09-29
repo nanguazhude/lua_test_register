@@ -84,10 +84,10 @@ namespace sstd {
     /**********************************************************************************/
     namespace private_sstd {
 
-        template<typename ...T>
+        template<typename ...TName>
         class class_wrap {
         public:
-            constexpr static inline std::size_t size() { return sizeof...(T); }
+            constexpr static inline std::size_t size() { return sizeof...(TName); }
         };
 
         template<>
@@ -96,7 +96,7 @@ namespace sstd {
             constexpr static inline std::size_t size() { return 0; }
         };
 
-        template<typename T> class get_first;
+        template<typename TName> class get_first;
         template<template<typename ...> class A, typename ATF, typename ATS, typename ... AT>
         class get_first< A< ATF, ATS, AT ...> > {
         public:
@@ -231,10 +231,10 @@ namespace sstd {
 
         template<typename ... > class cat;
 
-        template<template<typename ...> class A, typename ... T>
-        class cat<A<T...>> {
+        template<template<typename ...> class A, typename ... TName>
+        class cat<A<TName...>> {
         public:
-            using type = class_wrap<T...>;
+            using type = class_wrap<TName...>;
         };
 
         template<template<typename ...> class A0, typename ...T0,
@@ -244,59 +244,59 @@ namespace sstd {
             using type = typename _private::cat2< class_wrap<T0...>, class_wrap<T1...> >::type;
         };
 
-        template<typename T1, typename T2, typename T3, typename ... T>
-        class cat<T1, T2, T3, T...> {
+        template<typename T1, typename T2, typename T3, typename ... TName>
+        class cat<T1, T2, T3, TName...> {
         public:
-            using type = typename cat< typename cat<T1, T2>::type, typename cat<T3, T...>::type >::type;
+            using type = typename cat< typename cat<T1, T2>::type, typename cat<T3, TName...>::type >::type;
         };
 
-        template<typename ... T>
+        template<typename ... TName>
         class unique_cat {
-            using cat_type = typename cat<T...>::type;
+            using cat_type = typename cat<TName...>::type;
         public:
             using type = typename unique<cat_type>::type;
         };
 
         namespace _private_helper {
 
-            template<typename T, typename = void>
+            template<typename TName, typename = void>
             class has_supers_help {
             public:
                 using supers = private_sstd::class_wrap< void >;
                 using type = supers;
             };
 
-            template<typename T>
-            class has_supers_help<T, std::enable_if_t<sizeof(typename T::supers)>> {
+            template<typename TName>
+            class has_supers_help<TName, std::enable_if_t<sizeof(typename TName::supers)>> {
             public:
-                using supers = typename T::supers;
+                using supers = typename TName::supers;
                 using type = supers;
             };
 
-            template<std::size_t N, typename T, bool = (N < T::size()) >
-            class tree_to_list_helper {
-            public:
-                using type = T;
-            };
+            template<std::size_t N, typename TName, bool = (N < TName::size()) >
+                class tree_to_list_helper {
+                public:
+                    using type = TName;
+                };
 
-            template<std::size_t N, typename T >
-            class tree_to_list_helper<N, T, true > {
-                static_assert(N < 256, "this may be a error");
-                using TypeN = typename private_sstd::get_from_index<N, T>::type/*get_from_index*/;
-                using TypeNSupers = typename has_supers_help</*HasSupers*/TypeN>::type/*HasSupers*/;
-                using TypeNext = typename private_sstd::unique_cat< T, TypeNSupers/*unique_cat*/>::type/*unique_cat*/;
-            public:
-                using type =
-                    typename tree_to_list_helper< N + 1, TypeNext/*TreeToListHelper*/>::type/*TreeToListHelper*/;
-            };
+                template<std::size_t N, typename TName >
+                class tree_to_list_helper<N, TName, true > {
+                    static_assert(N < 256, "this may be a error");
+                    using TypeN = typename private_sstd::get_from_index<N, TName>::type/*get_from_index*/;
+                    using TypeNSupers = typename has_supers_help</*HasSupers*/TypeN>::type/*HasSupers*/;
+                    using TypeNext = typename private_sstd::unique_cat< TName, TypeNSupers/*unique_cat*/>::type/*unique_cat*/;
+                public:
+                    using type =
+                        typename tree_to_list_helper< N + 1, TypeNext/*TreeToListHelper*/>::type/*TreeToListHelper*/;
+                };
 
         }
 
-        template<typename T>
+        template<typename TName>
         class tree_to_list {
             using _supers = typename private_sstd::unique_cat<
                 private_sstd::class_wrap<void>,
-                typename _private_helper::has_supers_help<T>::type
+                typename _private_helper::has_supers_help<TName>::type
             >::type;
         public:
             using type = typename _private_helper::tree_to_list_helper< 0, _supers  >::type;
@@ -305,22 +305,24 @@ namespace sstd {
     }/*namespace private sstd*/
     /**********************************************************************************/
 
-    template<typename ...T>
-    using class_wrap = private_sstd::class_wrap<T...>;
+    template<typename ...TName>
+    using class_wrap = private_sstd::class_wrap<TName...>;
 
     using RegisterFunctionType = std::pair<std::string_view, lua_CFunction>;
     template<typename Child>
     class IntBasicRegister {
     public:
-        static constexpr std::string_view typeName() { return "int"sv; }
-        static constexpr std::initializer_list<RegisterFunctionType> getFunctions() { return{}; }
+        constexpr static std::string_view typeName() { return "int"sv; }
+        constexpr static std::initializer_list<RegisterFunctionType> getFunctions() { return{}; }
         using supers = class_wrap<void>;
         using this_type = int;
+    private:
+        static_assert((std::is_same_v<this_type,Child>)||(std::is_base_of_v<this_type,Child>),"Child must be child of this_type");
     };
 
     namespace private_register_type {
 
-        template<typename T, typename SuperType>
+        template<typename TName, typename SuperType>
         void register_super(LuaTypeFunctionsMap * childMap) {
             using ThisType = SuperType;
             const auto varThisTypeIndex = setRegisterTypeIndex(ThisType::typeName());
@@ -333,27 +335,27 @@ namespace sstd {
             }
             {
                 varThisFuncsMap->appendFunction(varThisTypeIndex, [](void * arg)->void * {
-                    return static_cast<SuperType*>(reinterpret_cast<T *>(arg));
+                    return static_cast<typename SuperType::this_type*>(reinterpret_cast<TName *>(arg));
                 });
             }
         }
 
         template<typename, typename>class register_super_help;
 
-        template<typename T, template<typename ...> class U, typename ... Supers>
-        class register_super_help<T, U<Supers...>> {
+        template<typename TName, template<typename ...> class U, typename ... Supers>
+        class register_super_help<TName, U<Supers...>> {
         public:
             static void run(LuaTypeFunctionsMap * arg) {
-                (register_super<T, Supers>(arg), ...);
+                (register_super<TName, Supers>(arg), ...);
             }
         };
 
     }/*private_register_type*/
 
-    template<typename This, template<typename...> class Type >
+    template<typename This, typename ThisType/* SomeType<This> */ >
     LuaKeyUnsignedInteger registerType() {
-        using ThisType = Type<This>;
-        const auto varThisTypeIndex = setRegisterTypeIndex(ThisType::typeName());
+        const std::string_view argTypeName = ThisType::typeName();
+        const auto varThisTypeIndex = setRegisterTypeIndex(argTypeName);
         std::shared_ptr<LuaTypeFunctionsMap> varThisFuncsMap = getRegisterFunctionMap(varThisTypeIndex);
         {/*register the functions*/
             std::initializer_list<RegisterFunctionType> varThisFuncs = ThisType::getFunctions();
@@ -368,13 +370,27 @@ namespace sstd {
         }
         {/*add supers*/
             using super_types = typename private_sstd::tree_to_list<ThisType>::type;
-            register_super_help<This, super_types>::run(varThisFuncsMap.get());
+            if constexpr (super_types::size()) {
+                private_register_type::register_super_help<This, super_types>::run(varThisFuncsMap.get());
+            }
         }
         {/*add std index support*/
-            attachStdTypeIndex(ThisType::typeName(), typeid(This));
+            attachStdTypeIndex(argTypeName, typeid(This));
         }
         return varThisTypeIndex;
     }
+
+    template<typename TName/*wrap name*/ , template<typename> class S/*wrap name*/>
+    class direct_no_member_warp final {
+        /**T should have function like static constexpr std::string_view typeName() { return "int"sv; }**/
+    public:
+        using this_type =typename TName::this_type;
+        using supers = sstd::class_wrap<S<this_type>>;
+        static constexpr inline std::initializer_list<RegisterFunctionType> getFunctions() { return{}; }
+        static constexpr inline std::string_view typeName() { return TName::typeName(); }
+    private:
+        static_assert(std::is_final_v<this_type>,"this_type must be final");
+    };
 
 }/*namespace sstd*/
 
