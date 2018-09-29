@@ -18,7 +18,7 @@ win32-msvc*{
     CONFIG+=c++17
 }
 
-
+CONFIG+=console
 
 
 

@@ -535,7 +535,7 @@ namespace sstd {
     };
 
     template<typename T, typename ...Args>
-    std::shared_ptr<DirectCreateRuntimeClass<std::remove_const_t<T>>> cretaeDirectCreateRuntimeClass(Args && ... args) {
+    inline std::shared_ptr<DirectCreateRuntimeClass<std::remove_const_t<T>>> cretaeDirectCreateRuntimeClass(Args && ... args) {
         return std::make_shared<DirectCreateRuntimeClass<std::remove_const_t<T>>>(std::forward<Args>(args)...);
     }
 
